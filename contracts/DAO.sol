@@ -23,7 +23,7 @@ contract NFT is ERC1155 {
 
 contract DAO is ReentrancyGuard {
     address public owner;
-    mapping(uint256 => uint256) public treasuries;  // nft type => treasury
+    mapping(uint8 => uint256) public treasuries;  // nft type => treasury
     mapping(uint256 => Proposal) public proposals;  // proposal id => proposal
     mapping(address => mapping(uint8 => uint8)) public stakedTokens;  // user => token type => staked amount
     mapping(address => uint256) public stakingDeadlines;  // user => deadline
@@ -47,7 +47,7 @@ contract DAO is ReentrancyGuard {
         For, Against
     }
 
-    function donate(uint256 nftTypeId) public payable {
+    function donate(uint8 nftTypeId) public payable {
         treasuries[nftTypeId] += msg.value;
     }
 
