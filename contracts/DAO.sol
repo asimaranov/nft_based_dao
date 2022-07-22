@@ -23,7 +23,6 @@ contract NFT is ERC1155 {
 }
 
 contract DAO is ReentrancyGuard, ERC1155Holder {
-    address public owner;
     mapping(NftType => uint256) public treasuries;  // nft type => treasury
     mapping(uint256 => Proposal) public proposals;  // proposal id => proposal
     mapping(address => mapping(NftType => uint8)) public stakedTokens;  // user => token type => staked amount
@@ -57,7 +56,6 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     }
 
     constructor(uint256 debatingPeriod_, address nftAddress) {
-        owner = msg.sender;
         debatingPeriod = debatingPeriod_;
         nft = IERC1155(nftAddress);
     }
