@@ -108,6 +108,7 @@ describe("Test NFT based DAO", function () {
   });
 
   it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
+    
   });
 
   it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {

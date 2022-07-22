@@ -10,23 +10,23 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 uint256 constant NFT_ITEMS_NUM = 20;
 uint256 constant NFT_MINIMUM_QUORUM = 14;  // Ceil of QUORUM * 2 / 3
 
-contract NFT is ERC1155 {
-    uint256 public constant GOLD = 0;
-    uint256 public constant SILVER = 1;
-    uint256 public constant BRONZE = 2;
+enum NftType {
+    GOLD, SILVER, BRONZE
+}
 
+contract NFT is ERC1155 {
     constructor () ERC1155("") {
-        _mint(msg.sender, GOLD, NFT_ITEMS_NUM, "");
-        _mint(msg.sender, SILVER, NFT_ITEMS_NUM, "");
-        _mint(msg.sender, BRONZE, NFT_ITEMS_NUM, "");
+        _mint(msg.sender, uint256(NftType.GOLD), NFT_ITEMS_NUM, "");
+        _mint(msg.sender, uint256(NftType.SILVER), NFT_ITEMS_NUM, "");
+        _mint(msg.sender, uint256(NftType.BRONZE), NFT_ITEMS_NUM, "");
     }
 }
 
 contract DAO is ReentrancyGuard, ERC1155Holder {
     address public owner;
-    mapping(uint8 => uint256) public treasuries;  // nft type => treasury
+    mapping(NftType => uint256) public treasuries;  // nft type => treasury
     mapping(uint256 => Proposal) public proposals;  // proposal id => proposal
-    mapping(address => mapping(uint8 => uint8)) public stakedTokens;  // user => token type => staked amount
+    mapping(address => mapping(NftType => uint8)) public stakedTokens;  // user => token type => staked amount
     mapping(address => uint256) public stakingDeadlines;  // user => deadline
     mapping(address => mapping (uint256 => bool)) public votedUsers;  // user id => voting id => is voted
 
@@ -39,12 +39,12 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
 
     struct Proposal {
         uint256 proposalId;
+        NftType nftType;
         uint256 deadline;
         address payable userToWithdraw;  
         uint8 votesFor;
         uint8 votesAgainst;  
-        uint8 nftType;
-        bool finished;  // Struct packing optimization. 20 + 1 * 4 bytes will use one EVM slot
+        bool finished;  // Struct packing optimization. 20 + 1 * 3 bytes will use one EVM slot
         string description;
     }
 
@@ -52,8 +52,8 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         For, Against
     }
 
-    function donate(uint8 nftTypeId) public payable {
-        treasuries[nftTypeId] += msg.value;
+    function donate(NftType nftType) public payable {
+        treasuries[nftType] += msg.value;
     }
 
     constructor(uint256 debatingPeriod_, address nftAddress) {
@@ -62,20 +62,20 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         nft = IERC1155(nftAddress);
     }
 
-    function addProposal(uint8 nftType, address payable userToWithdraw, string memory description) public {
+    function addProposal(NftType nftType, address payable userToWithdraw, string memory description) public {
         uint256 newProposalId = proposalsNum;
         uint256 proposalDeadline = block.timestamp + debatingPeriod;
-        proposals[newProposalId] = Proposal(newProposalId, proposalDeadline, userToWithdraw, 0, 0, nftType, false, description);
+        proposals[newProposalId] = Proposal(newProposalId, nftType, proposalDeadline, userToWithdraw, 0, 0, false, description);
         proposalsNum++;
         stakingDeadlines[msg.sender] = proposalDeadline;
     }
 
-    function stakeNFT(uint8 tokenType, uint8 amount) public {
+    function stakeNFT(NftType tokenType, uint8 amount) public {
         nft.safeTransferFrom(msg.sender, address(this), uint256(tokenType), uint256(amount), "");
         stakedTokens[msg.sender][tokenType] += amount;
     }
 
-    function unstakeNFT(uint8 tokenType, uint8 amount) public {
+    function unstakeNFT(NftType tokenType, uint8 amount) public {
         require(stakingDeadlines[msg.sender] <= block.timestamp, "It's too early");
         nft.safeTransferFrom(address(this), msg.sender, uint256(tokenType), uint256(amount), "");
         
