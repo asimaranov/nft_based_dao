@@ -1,8 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { assert } from "console";
 import { BigNumber } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { DAO, NFT } from "../typechain";
 
 describe("Test NFT based DAO", function () {
@@ -12,6 +11,9 @@ describe("Test NFT based DAO", function () {
   let owner: SignerWithAddress;
   let regularUser: SignerWithAddress;
   let userToWithdraw: SignerWithAddress;
+  const firstProposalId = 0;
+  const initialNftItemSupply = 20;
+  const proposalPeriod = 60;
 
   enum NftType {
     GOLD = 0,
@@ -24,15 +26,12 @@ describe("Test NFT based DAO", function () {
     AGAINST = 1
   }
 
-
-  const initialNftItemSupply = 20;
-
   this.beforeEach(async () => {
     const NFTContract = await ethers.getContractFactory("NFT");
     nft = await NFTContract.deploy();
 
     const DAOContract = await ethers.getContractFactory("DAO");
-    dao = await DAOContract.deploy(60, nft.address);
+    dao = await DAOContract.deploy(proposalPeriod, nft.address);
 
     [owner, regularUser, userToWithdraw] = await ethers.getSigners();
   })
@@ -42,7 +41,6 @@ describe("Test NFT based DAO", function () {
     await nft.setApprovalForAll(dao.address, true);
     await dao.stakeNFT(NftType.GOLD, sumToStake);
     await nft.setApprovalForAll(dao.address, false);
-
     expect(await nft.balanceOf(owner.address, NftType.GOLD)).to.equal(BigNumber.from(initialNftItemSupply - sumToStake));
   });
 
@@ -53,8 +51,61 @@ describe("Test NFT based DAO", function () {
     expect(await owner.getBalance()).to.lte(initialUserBalance.sub(sumToDonate));
   });
 
-  it("Test proposal creating", async function () {
+  it("Test that user can't finish proposal until deadline", async function () {
     await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+    await expect(dao.finishProposal(firstProposalId)).to.be.revertedWith("It's too early");
   });
+
+  it("Test proposal rejecting if required quorum is not reached", async function () {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    const sumToStake = 5;
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.vote(firstProposalId, VoteType.FOR);
+
+    await network.provider.send("evm_increaseTime", [proposalPeriod+1]);
+    
+    const finishTransaction = await dao.finishProposal(firstProposalId);
+    const rc = await finishTransaction.wait();
+    expect(rc.events?.findIndex(x => x.event == 'ProposalRejected')).to.not.equal(-1);
+  });
+
+  it("Test proposal execution if required quorum is reached", async function () {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    const sumToStake = 15;
+    const sumToDonate = BigNumber.from(10_000);
+
+    await dao.donate(NftType.GOLD, {value: sumToDonate});
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.vote(firstProposalId, VoteType.FOR);
+
+    await network.provider.send("evm_increaseTime", [proposalPeriod+1]);
+    
+    const userToWithdrawInitialBalance = await userToWithdraw.getBalance();
+    const finishTransaction = await dao.finishProposal(firstProposalId);
+    const rc = await finishTransaction.wait();
+    expect(rc.events?.findIndex(x => x.event == 'ProposalSucceeded')).to.not.equal(-1);
+    expect((await userToWithdraw.getBalance()).eq(userToWithdrawInitialBalance.add(sumToDonate))).to.be.true;
+  });
+
+  it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
+  });
+
+  it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
+    const sumToStake = 15;
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.unstakeNFT(NftType.GOLD, sumToStake);
+
+  })
 
 });

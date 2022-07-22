@@ -30,6 +30,8 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     mapping(address => uint256) public stakingDeadlines;  // user => deadline
     mapping(address => mapping (uint256 => bool)) public votedUsers;  // user id => voting id => is voted
 
+    event ProposalSucceeded();
+    event ProposalRejected();
 
     uint256 public proposalsNum;
     uint256 public debatingPeriod;
@@ -46,7 +48,7 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         string description;
     }
 
-    enum VotingType {
+    enum VoteType {
         For, Against
     }
 
@@ -75,12 +77,12 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
 
     function unstakeNFT(uint8 tokenType, uint8 amount) public {
         require(stakingDeadlines[msg.sender] <= block.timestamp, "It's too early");
-        nft.safeTransferFrom(msg.sender, address(this), uint256(tokenType), uint256(amount), "");
+        nft.safeTransferFrom(address(this), msg.sender, uint256(tokenType), uint256(amount), "");
         
         stakedTokens[msg.sender][tokenType] += amount;
     }
 
-    function vote(uint256 proposalId, VotingType votingType) public {
+    function vote(uint256 proposalId, VoteType votingType) public {
         Proposal memory proposal = proposals[proposalId];
         require(!proposal.finished, "Proposal is finished");
         require(proposal.deadline > block.timestamp, "Proposal reached deadline");
@@ -90,7 +92,7 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
 
         uint8 votingPower = stakedTokens[msg.sender][proposal.nftType]; // Ok because we have no more than 20 tokens
         
-        if (votingType == VotingType.For) {
+        if (votingType == VoteType.For) {
             proposals[proposalId].votesFor += votingPower;
         } else {
             proposals[proposalId].votesAgainst += votingPower;
@@ -106,6 +108,9 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
             uint256 amountToTransfer = treasuries[proposal.nftType];  // State is mutated before transfer to avoid reentrancy tho function is already protected by nonReentrant modifier
             treasuries[proposal.nftType] = 0;
             proposal.userToWithdraw.transfer(amountToTransfer);
+            emit ProposalSucceeded();
+        } else {
+            emit ProposalRejected();
         }
     }
 }
