@@ -19,12 +19,12 @@ describe("Test NFT based DAO", function () {
     GOLD = 0,
     SILVER = 1,
     BRONZE = 2
-  }
+  };
 
   enum VoteType {
     FOR = 0,
     AGAINST = 1
-  }
+  };
 
   this.beforeEach(async () => {
     const NFTContract = await ethers.getContractFactory("NFT");
@@ -108,10 +108,20 @@ describe("Test NFT based DAO", function () {
   });
 
   it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
-    
+    const sumToStake = 15;
+
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+
+    await dao.vote(firstProposalId, VoteType.FOR);
+
+    await nft.setApprovalForAll(dao.address, false);
+    await expect(dao.unstakeNFT(NftType.GOLD, sumToStake)).to.be.revertedWith("It's too early");
   });
 
-  it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
+  it("Test that stakeholder can if otherwise", async () => {
     const sumToStake = 15;
 
     await nft.setApprovalForAll(dao.address, true);
@@ -119,6 +129,43 @@ describe("Test NFT based DAO", function () {
     await nft.setApprovalForAll(dao.address, false);
     await dao.unstakeNFT(NftType.GOLD, sumToStake);
 
-  })
+  });
+
+  it("Check that user can't finish or revote a finished proposal", async () => {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    const sumToStake = 5;
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.vote(firstProposalId, VoteType.FOR);
+
+    await network.provider.send("evm_increaseTime", [proposalPeriod+1]);
+    
+    await dao.finishProposal(firstProposalId);
+    await expect(dao.finishProposal(firstProposalId)).to.be.revertedWith("Proposal is finished");
+    await expect(dao.vote(firstProposalId, VoteType.FOR)).to.be.revertedWith("Proposal is finished");
+  });
+
+  it("Check that user can't vote on an expired proposal", async () => {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    const sumToStake = 5;
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.vote(firstProposalId, VoteType.FOR);
+
+    await network.provider.send("evm_increaseTime", [proposalPeriod+1]);
+    await expect(dao.vote(firstProposalId, VoteType.FOR)).to.be.revertedWith("Proposal reached deadline");
+  });
+
+  it("Check that user can't vote with no voting power", async () => {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+    await expect(dao.vote(firstProposalId, VoteType.FOR)).to.be.revertedWith("You have no voting power");
+  });
+
 
 });

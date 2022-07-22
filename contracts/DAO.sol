@@ -65,9 +65,16 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     function addProposal(NftType nftType, address payable userToWithdraw, string memory description) public {
         uint256 newProposalId = proposalsNum;
         uint256 proposalDeadline = block.timestamp + debatingPeriod;
-        proposals[newProposalId] = Proposal(newProposalId, nftType, proposalDeadline, userToWithdraw, 0, 0, false, description);
+        proposals[newProposalId] = Proposal(
+            newProposalId, 
+            nftType, 
+            proposalDeadline, 
+            userToWithdraw, 
+            0, 
+            0, 
+            false, 
+            description);
         proposalsNum++;
-        stakingDeadlines[msg.sender] = proposalDeadline;
     }
 
     function stakeNFT(NftType tokenType, uint8 amount) public {
@@ -88,15 +95,19 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         require(proposal.deadline > block.timestamp, "Proposal reached deadline");
         require(!votedUsers[msg.sender][proposalId], "Already voted!");
 
-        votedUsers[msg.sender][proposalId] = true;
-
         uint8 votingPower = stakedTokens[msg.sender][proposal.nftType]; // Ok because we have no more than 20 tokens
+
+        require(votingPower > 0, "You have no voting power");
+
+        votedUsers[msg.sender][proposalId] = true;
         
         if (votingType == VoteType.For) {
             proposals[proposalId].votesFor += votingPower;
         } else {
             proposals[proposalId].votesAgainst += votingPower;
         }
+
+        stakingDeadlines[msg.sender] = proposal.deadline;
     }
 
     function finishProposal(uint256 proposalId) public nonReentrant {
