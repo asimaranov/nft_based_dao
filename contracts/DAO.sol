@@ -102,6 +102,8 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     function finishProposal(uint256 proposalId) public nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.deadline <= block.timestamp, "It's too early");
+        require(!proposal.finished, "Proposal is finished");
+
         proposal.finished = true;
 
         if (proposal.votesFor > NFT_MINIMUM_QUORUM) {

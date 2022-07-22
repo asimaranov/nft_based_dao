@@ -95,6 +95,18 @@ describe("Test NFT based DAO", function () {
     expect((await userToWithdraw.getBalance()).eq(userToWithdrawInitialBalance.add(sumToDonate))).to.be.true;
   });
 
+  it("Check that user can't vote second time", async function () {
+    await dao.connect(regularUser).addProposal(NftType.GOLD, userToWithdraw.address, "To a nice user");
+
+    const sumToStake = 5;
+
+    await nft.setApprovalForAll(dao.address, true);
+    await dao.stakeNFT(NftType.GOLD, sumToStake);
+    await nft.setApprovalForAll(dao.address, false);
+    await dao.vote(firstProposalId, VoteType.AGAINST);
+    await expect(dao.vote(firstProposalId, VoteType.AGAINST)).to.be.revertedWith("Already voted!");
+  });
+
   it("Test that stakeholder can't unstake nft if he has an active proposal", async () => {
   });
 
