@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 uint256 constant NFT_ITEMS_NUM = 20;
 uint256 constant NFT_MINIMUM_QUORUM = 14;  // Ceil of QUORUM * 2 / 3
@@ -21,7 +22,7 @@ contract NFT is ERC1155 {
     }
 }
 
-contract DAO is ReentrancyGuard {
+contract DAO is ReentrancyGuard, ERC1155Holder {
     address public owner;
     mapping(uint8 => uint256) public treasuries;  // nft type => treasury
     mapping(uint256 => Proposal) public proposals;  // proposal id => proposal
