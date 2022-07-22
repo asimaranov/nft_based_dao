@@ -28,6 +28,8 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     mapping(uint256 => Proposal) public proposals;  // proposal id => proposal
     mapping(address => mapping(uint8 => uint8)) public stakedTokens;  // user => token type => staked amount
     mapping(address => uint256) public stakingDeadlines;  // user => deadline
+    mapping(address => mapping (uint256 => bool)) public votedUsers;  // user id => voting id => is voted
+
 
     uint256 public proposalsNum;
     uint256 public debatingPeriod;
@@ -82,6 +84,9 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         Proposal memory proposal = proposals[proposalId];
         require(!proposal.finished, "Proposal is finished");
         require(proposal.deadline > block.timestamp, "Proposal reached deadline");
+        require(!votedUsers[msg.sender][proposalId], "Already voted!");
+
+        votedUsers[msg.sender][proposalId] = true;
 
         uint8 votingPower = stakedTokens[msg.sender][proposal.nftType]; // Ok because we have no more than 20 tokens
         
