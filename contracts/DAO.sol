@@ -88,7 +88,7 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
     }
 
     function vote(uint256 proposalId, VoteType votingType) public {
-        Proposal memory proposal = proposals[proposalId];
+        Proposal storage proposal = proposals[proposalId];
         require(!proposal.finished, "Proposal is finished");
         require(proposal.deadline > block.timestamp, "Proposal reached deadline");
         require(!votedUsers[msg.sender][proposalId], "Already voted!");
@@ -100,9 +100,13 @@ contract DAO is ReentrancyGuard, ERC1155Holder {
         votedUsers[msg.sender][proposalId] = true;
         
         if (votingType == VoteType.For) {
-            proposals[proposalId].votesFor += votingPower;
+            unchecked {
+                proposal.votesFor += votingPower;
+            }
         } else {
-            proposals[proposalId].votesAgainst += votingPower;
+            unchecked {
+                proposal.votesAgainst += votingPower;
+            }
         }
 
         stakingDeadlines[msg.sender] = proposal.deadline;
